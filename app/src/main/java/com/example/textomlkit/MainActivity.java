@@ -6,6 +6,8 @@ import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.speech.tts.TextToSpeech;
+import android.view.View;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -32,6 +34,9 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     private TextView textoReconocido;
     private TextRecognizer textRecognizer;
     private TextToSpeech textToSpeech;
+    private Button btnTomarFoto;
+    private Button btnParar;
+    private Button btnReleer;
 
     // ActivityResultLauncher para manejar el resultado de la cámara
     private final ActivityResultLauncher<Intent> cameraLauncher = registerForActivityResult(
@@ -43,9 +48,8 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     imageView.setImageBitmap(imageBitmap);
                     procesarImagenParaTexto(imageBitmap);
                 } else {
-                    // Si el usuario cancela la cámara, cerramos la actividad.
+                    // Si el usuario cancela la cámara, ya no cerramos la actividad.
                     Toast.makeText(this, "Captura de foto cancelada.", Toast.LENGTH_SHORT).show();
-                    finish();
                 }
             }
     );
@@ -57,6 +61,24 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
 
         imageView = findViewById(R.id.imageView);
         textoReconocido = findViewById(R.id.textoReconocido);
+        btnTomarFoto = findViewById(R.id.btnTomarFoto);
+        btnParar = findViewById(R.id.btnParar);
+        btnReleer = findViewById(R.id.btnReleer);
+
+        btnTomarFoto.setOnClickListener(v -> abrirCamara());
+
+        btnParar.setOnClickListener(v -> {
+            if (textToSpeech != null && textToSpeech.isSpeaking()) {
+                textToSpeech.stop();
+            }
+        });
+
+        btnReleer.setOnClickListener(v -> {
+            String texto = textoReconocido.getText().toString();
+            if (!texto.isEmpty()) {
+                leerTextoEnVozAlta(texto);
+            }
+        });
 
         textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
         textToSpeech = new TextToSpeech(this, this);
