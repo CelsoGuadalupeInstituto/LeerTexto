@@ -5,6 +5,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.speech.tts.TextToSpeech;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -22,12 +23,15 @@ import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.TextRecognizer;
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 
-public class MainActivity extends AppCompatActivity {
+import java.util.Locale;
+
+public class MainActivity extends AppCompatActivity implements TextToSpeech.OnInitListener {
 
     private static final int REQUEST_CAMERA_PERMISSION = 101;
     private ImageView imageView;
     private TextView textoReconocido;
     private TextRecognizer textRecognizer;
+    private TextToSpeech textToSpeech;
 
     // ActivityResultLauncher para manejar el resultado de la cámara
     private final ActivityResultLauncher<Intent> cameraLauncher = registerForActivityResult(
@@ -55,6 +59,7 @@ public class MainActivity extends AppCompatActivity {
         textoReconocido = findViewById(R.id.textoReconocido);
 
         textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+        textToSpeech = new TextToSpeech(this, this);
 
         // Al iniciar, verificar permisos y abrir la cámara directamente
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA)
@@ -95,6 +100,13 @@ public class MainActivity extends AppCompatActivity {
             textoReconocido.setText("No se encontró texto.");
         } else {
             textoReconocido.setText(texto);
+            leerTextoEnVozAlta(texto);
+        }
+    }
+
+    private void leerTextoEnVozAlta(String texto) {
+        if (textToSpeech != null && !textToSpeech.isSpeaking()) {
+            textToSpeech.speak(texto, TextToSpeech.QUEUE_FLUSH, null, null);
         }
     }
 
@@ -109,5 +121,26 @@ public class MainActivity extends AppCompatActivity {
                 finish();
             }
         }
+    }
+
+    @Override
+    public void onInit(int status) {
+        if (status == TextToSpeech.SUCCESS) {
+            int result = textToSpeech.setLanguage(new Locale("es", "ES"));
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                Toast.makeText(this, "El idioma español no es compatible.", Toast.LENGTH_SHORT).show();
+            }
+        } else {
+            Toast.makeText(this, "Error al inicializar TextToSpeech.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (textToSpeech != null) {
+            textToSpeech.stop();
+            textToSpeech.shutdown();
+        }
+        super.onDestroy();
     }
 }
