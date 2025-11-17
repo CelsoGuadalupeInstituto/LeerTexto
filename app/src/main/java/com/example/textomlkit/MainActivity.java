@@ -1,0 +1,113 @@
+package com.example.textomlkit;
+
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.os.Bundle;
+import android.provider.MediaStore;
+import android.widget.ImageView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
+import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.text.Text;
+import com.google.mlkit.vision.text.TextRecognition;
+import com.google.mlkit.vision.text.TextRecognizer;
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
+
+public class MainActivity extends AppCompatActivity {
+
+    private static final int REQUEST_CAMERA_PERMISSION = 101;
+    private ImageView imageView;
+    private TextView textoReconocido;
+    private TextRecognizer textRecognizer;
+
+    // ActivityResultLauncher para manejar el resultado de la cámara
+    private final ActivityResultLauncher<Intent> cameraLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                    Bundle extras = result.getData().getExtras();
+                    Bitmap imageBitmap = (Bitmap) extras.get("data");
+                    imageView.setImageBitmap(imageBitmap);
+                    procesarImagenParaTexto(imageBitmap);
+                } else {
+                    // Si el usuario cancela la cámara, cerramos la actividad.
+                    Toast.makeText(this, "Captura de foto cancelada.", Toast.LENGTH_SHORT).show();
+                    finish();
+                }
+            }
+    );
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        imageView = findViewById(R.id.imageView);
+        textoReconocido = findViewById(R.id.textoReconocido);
+
+        textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+
+        // Al iniciar, verificar permisos y abrir la cámara directamente
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.CAMERA}, REQUEST_CAMERA_PERMISSION);
+        } else {
+            abrirCamara();
+        }
+    }
+
+    private void abrirCamara() {
+        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
+            cameraLauncher.launch(takePictureIntent);
+        }
+    }
+
+    private void procesarImagenParaTexto(Bitmap bitmap) {
+        if (bitmap == null) {
+            Toast.makeText(this, "No se pudo obtener la imagen", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        InputImage image = InputImage.fromBitmap(bitmap, 0);
+
+        textRecognizer.process(image)
+                .addOnSuccessListener(visionText -> {
+                    extraerTexto(visionText);
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(MainActivity.this, "Error al procesar texto: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void extraerTexto(Text result) {
+        String texto = result.getText();
+        if (texto.isEmpty()) {
+            textoReconocido.setText("No se encontró texto.");
+        } else {
+            textoReconocido.setText(texto);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_CAMERA_PERMISSION) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                abrirCamara();
+            } else {
+                Toast.makeText(this, "Permiso de cámara denegado. La aplicación se cerrará.", Toast.LENGTH_SHORT).show();
+                finish();
+            }
+        }
+    }
+}
